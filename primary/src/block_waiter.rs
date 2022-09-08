@@ -796,13 +796,13 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
             }
         }
 
-        let processing_time_in_millis: u64 = std::time::SystemTime::now()
+        let processing_time_in_micros: u64 = std::time::SystemTime::now()
             .duration_since(start)
             .unwrap()
-            .as_millis()
+            .as_micros()
             .try_into()
             .unwrap();
-        info!("Handled batch message in processing_time_in_milis={} ", processing_time_in_millis)
+        info!("Handled batch message in processing_time_in_micros={} ", processing_time_in_micros)
     }
 
     /// A helper method to "wait" for all the batch responses to be received.

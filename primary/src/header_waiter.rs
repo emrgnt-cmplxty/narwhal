@@ -194,6 +194,8 @@ impl HeaderWaiter {
 
             tokio::select! {
                 Some(message) = self.rx_synchronizer.recv(), if waiting.available_permits() > 0 => {
+
+                    let start = std::time::SystemTime::now();
                     match message {
                         WaiterMessage::SyncBatches(missing, header) => {
                             debug!("Synching the payload of {header}");
@@ -282,6 +284,14 @@ impl HeaderWaiter {
                             }
                         }
                     }
+                    let processing_time_in_micros: u64 = std::time::SystemTime::now()
+                    .duration_since(start)
+                    .unwrap()
+                    .as_micros()
+                    .try_into()
+                    .unwrap();
+                    info!("Handled synchronize message in processing_time_in_micros={} ", processing_time_in_micros)
+        
                 },
 
                 // we poll the availability of a slot to send the result to the core simultaneously
