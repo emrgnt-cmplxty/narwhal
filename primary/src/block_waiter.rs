@@ -605,11 +605,11 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
                 .or_insert_with(Vec::new)
                 .push(sender);
 
-            trace!("Block with id {} already has a pending request", id.clone());
+                debug!("Block with id {} already has a pending request", id.clone());
             return None;
         }
 
-        trace!("No pending get block for {}", id);
+        debug!("No pending get block for {}", id);
 
         // Add on a vector the receivers
         let batch_receivers = self
@@ -780,8 +780,10 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
 
     async fn handle_batch_message(&mut self, result: BatchResult) {
         let start = std::time::SystemTime::now();
+        info!("result ={:?}", result);
 
         let batch_id: BatchDigest = result.clone().map_or_else(|e| e.id, |r| r.id);
+        info!("batch_id ={}", batch_id);
 
         match self.tx_pending_batch.remove(&batch_id) {
             Some(respond_to) => {
