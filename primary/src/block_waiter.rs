@@ -605,11 +605,11 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
                 .or_insert_with(Vec::new)
                 .push(sender);
 
-            trace!("Block with id {} already has a pending request", id.clone());
+                debug!("Block with id {} already has a pending request", id.clone());
             return None;
         }
 
-        trace!("No pending get block for {}", id);
+        debug!("No pending get block for {}", id);
 
         // Add on a vector the receivers
         let batch_receivers = self
@@ -779,10 +779,14 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
     }
 
     async fn handle_batch_message(&mut self, result: BatchResult) {
+        let start = std::time::SystemTime::now();
+
         let batch_id: BatchDigest = result.clone().map_or_else(|e| e.id, |r| r.id);
+        info!("batch_id ={}", batch_id);
 
         match self.tx_pending_batch.remove(&batch_id) {
             Some(respond_to) => {
+                info!("Responding with a pending batch that is length of ={}", respond_to.keys().len());
                 for (id, s) in respond_to {
                     let _ = s.send(result.clone())
                         .tap_err(|err| error!("Couldn't send batch result {batch_id} message to channel [{err:?}] for block_id {id}"));
@@ -792,6 +796,14 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
                 warn!("Couldn't find pending batch with id {}", &batch_id);
             }
         }
+
+        let processing_time_in_micros: u64 = std::time::SystemTime::now()
+            .duration_since(start)
+            .unwrap()
+            .as_micros()
+            .try_into()
+            .unwrap();
+        info!("Handled batch message in processing_time_in_micros={} ", processing_time_in_micros)
     }
 
     /// A helper method to "wait" for all the batch responses to be received.
