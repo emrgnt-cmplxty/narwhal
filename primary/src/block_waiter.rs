@@ -780,7 +780,6 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
 
     async fn handle_batch_message(&mut self, result: BatchResult) {
         let start = std::time::SystemTime::now();
-        info!("result ={:?}", result);
 
         let batch_id: BatchDigest = result.clone().map_or_else(|e| e.id, |r| r.id);
         info!("batch_id ={}", batch_id);
