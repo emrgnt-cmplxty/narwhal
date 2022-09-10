@@ -26,6 +26,8 @@ use std::sync::Arc;
 use telemetry_subscribers::TelemetryGuards;
 use tokio::sync::mpsc::{channel, Receiver};
 use tracing::info;
+use config::utils::get_available_port;
+
 #[cfg(feature = "benchmark")]
 use tracing::subscriber::set_global_default;
 #[cfg(feature = "benchmark")]
@@ -237,7 +239,7 @@ async fn run(
                 .unwrap()
                 .parse::<WorkerId>()
                 .context("The worker id must be a positive integer")?;
-
+            info!("spawning workers now....");
             Node::spawn_workers(
                 /* primary_name */
                 primary_keypair.public().clone(),
@@ -253,7 +255,8 @@ async fn run(
     };
 
     // spin up prometheus server exporter
-    let prom_address = parameters.prometheus_metrics.socket_addr;
+    let prom_address = format!("/ip4/127.0.0.1/tcp/{}/http", get_available_port()).parse().unwrap();
+
     info!(
         "Starting Prometheus HTTP metrics endpoint at {}",
         prom_address

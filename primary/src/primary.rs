@@ -16,7 +16,7 @@ use crate::{
     state_handler::StateHandler,
     synchronizer::Synchronizer,
     BlockCommand, BlockRemover, CertificatesResponse, DeleteBatchMessage,
-    PayloadAvailabilityResponse,
+    PayloadAvailabilityResponse, EndpointMetrics,
 };
 
 use anemo::{types::PeerInfo, PeerId};
@@ -192,6 +192,7 @@ impl Primary {
             tx_helper_requests,
             tx_payload_availability_responses,
             tx_certificate_responses,
+            metrics: node_metrics.clone(),
         });
 
         let addr = network::multiaddr_to_address(&address).unwrap();
@@ -488,6 +489,7 @@ struct PrimaryReceiverHandler {
     tx_helper_requests: Sender<PrimaryMessage>,
     tx_payload_availability_responses: Sender<PayloadAvailabilityResponse>,
     tx_certificate_responses: Sender<CertificatesResponse>,
+    metrics: Arc<PrimaryMetrics>,
 }
 
 #[async_trait]
@@ -496,9 +498,11 @@ impl PrimaryToPrimary for PrimaryReceiverHandler {
         &self,
         request: anemo::Request<types::PrimaryMessage>,
     ) -> Result<anemo::Response<()>, anemo::rpc::Status> {
+        let start = std::time::SystemTime::now();
+
         let message = request.into_body();
 
-        match message {
+        let result = match message {
             PrimaryMessage::CertificatesRequest(_, _) => self
                 .tx_helper_requests
                 .send(message)
@@ -538,9 +542,14 @@ impl PrimaryToPrimary for PrimaryReceiverHandler {
                 .send(message)
                 .await
                 .map_err(|_| DagError::ShuttingDown),
-        }
+        };
+
+        config::utils::increment_channel_time(start,&self.metrics.primary_receiver_send_message);
+
+        result
         .map(|_| anemo::Response::new(()))
         .map_err(|e| anemo::rpc::Status::internal(e.to_string()))
+
     }
 }
 
@@ -597,6 +606,8 @@ impl WorkerToPrimary for WorkerReceiverHandler {
         &self,
         request: Request<BincodeEncodedPayload>,
     ) -> Result<Response<Empty>, Status> {
+        let start = std::time::SystemTime::now();
+
         let message: WorkerPrimaryMessage = request
             .into_inner()
             .deserialize()
@@ -656,6 +667,7 @@ impl WorkerToPrimary for WorkerReceiverHandler {
         }
         .map_err(|e| Status::not_found(e.to_string()))?;
 
+        config::utils::increment_channel_time(start,&self.metrics.worker_receiver_send_message);
         Ok(Response::new(Empty {}))
     }
 

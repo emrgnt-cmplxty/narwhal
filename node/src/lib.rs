@@ -378,7 +378,7 @@ impl Node {
         let mut handles = Vec::new();
 
         let metrics = initialise_metrics(registry);
-
+        info!("initialised metrics with registry={:?}", registry);
         for (id, keypair) in ids_and_keypairs {
             let worker_handles = Worker::spawn(
                 primary_name.clone(),
