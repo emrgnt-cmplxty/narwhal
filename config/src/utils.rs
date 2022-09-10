@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::net::{TcpListener, TcpStream};
+use prometheus::IntGauge;
+
 
 /// Return an ephemeral, available port. On unix systems, the port returned will be in the
 /// TIME_WAIT state ensuring that the OS won't hand out this port for some grace period.
@@ -30,4 +32,17 @@ fn get_ephemeral_port() -> ::std::io::Result<u16> {
     let _incoming = listener.accept()?;
 
     Ok(addr.port())
+}
+
+pub fn increment_channel_time(start: std::time::SystemTime, channel: &IntGauge) {
+    let end = std::time::SystemTime::now();
+    let diff: i64 = end
+        .duration_since(start)
+        .unwrap()
+        .as_micros()
+        .try_into()
+        .unwrap();
+
+    let prev_time = channel.get();
+    channel.set(prev_time + diff);
 }

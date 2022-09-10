@@ -23,7 +23,7 @@ class CommandMaker:
                       "--features", "benchmark dhat-heap"]
         else:
             params = ["--release", "--features", "benchmark"]
-        return ["cargo", "build", "--quiet"] + params
+        return ["cargo", "build"] + params
 
     @staticmethod
     def generate_key(filename):

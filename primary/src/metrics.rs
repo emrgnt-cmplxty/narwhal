@@ -302,6 +302,10 @@ pub struct PrimaryMetrics {
     pub pending_elements_certificate_waiter: IntGaugeVec,
     /// Number of elements in the waiting (ready-to-deliver) list of certificate_waiter
     pub waiting_elements_certificate_waiter: IntGaugeVec,
+    /// Time in WorkerReceiverHandler send message
+    pub worker_receiver_send_message: IntGauge,
+    /// Time in PrimaryReceiverHandler send message
+    pub primary_receiver_send_message: IntGauge,
 }
 
 impl PrimaryMetrics {
@@ -416,6 +420,18 @@ impl PrimaryMetrics {
                 "waiting_elements_certificate_waiter",
                 "Number of waiting elements in certificate waiter",
                 &["epoch"],
+                registry
+            )
+            .unwrap(),
+            worker_receiver_send_message: register_int_gauge_with_registry!(
+                "worker_receiver_send_message",
+                "Time spent calculating send_message in worker receiver",
+                registry
+            )
+            .unwrap(),
+            primary_receiver_send_message: register_int_gauge_with_registry!(
+                "primary_receiver_send_message",
+                "Time spent calculating send_message in primary receiver",
                 registry
             )
             .unwrap(),
