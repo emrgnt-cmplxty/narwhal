@@ -5,6 +5,7 @@ use crate::{
     errors::{SubscriberError, SubscriberResult},
     state::ExecutionIndices,
     ExecutionState, ExecutorOutput, SerializedTransaction,
+    metrics::ExecutorMetrics
 };
 use consensus::ConsensusOutput;
 use fastcrypto::Hash;
@@ -40,6 +41,8 @@ pub struct Core<State: ExecutionState> {
     tx_output: Sender<ExecutorOutput<State>>,
     /// The indices ensuring we do not execute twice the same transaction.
     execution_indices: ExecutionIndices,
+    /// The metrics handler
+    metrics: Arc<ExecutorMetrics>,
 }
 
 impl<State: ExecutionState> Drop for Core<State> {
@@ -62,6 +65,7 @@ where
         rx_reconfigure: watch::Receiver<ReconfigureNotification>,
         rx_subscriber: metered_channel::Receiver<ConsensusOutput>,
         tx_output: Sender<ExecutorOutput<State>>,
+        metrics: Arc<ExecutorMetrics>,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let execution_indices = execution_state
@@ -75,6 +79,7 @@ where
                 rx_subscriber,
                 tx_output,
                 execution_indices,
+                metrics
             }
             .run()
             .await
@@ -88,20 +93,24 @@ where
             tokio::select! {
                 // Execute all transactions associated with the consensus output message.
                 Some(message) = self.rx_subscriber.recv() => {
+                    let start = std::time::SystemTime::now();
                     // This function persists the necessary data to enable crash-recovery.
                     self.execute_certificate(&message).await?;
 
                     // Cleanup the temporary persistent storage.
                     self.cleanup_store(&message).await.map_err(SubscriberError::from)?;
+                    config::utils::increment_channel_time(start,&self.metrics.executor_core_rx_subscriber);
                 },
 
                 // Check whether the committee changed.
                 result = self.rx_reconfigure.changed() => {
+                    let start = std::time::SystemTime::now();
                     result.expect("Committee channel dropped");
                     let message = self.rx_reconfigure.borrow().clone();
                     if let ReconfigureNotification::Shutdown = message {
                         return Ok(());
                     }
+                    config::utils::increment_channel_time(start,&self.metrics.executor_core_rx_reconfigure);
                 }
             }
         }

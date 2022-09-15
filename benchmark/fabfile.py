@@ -26,11 +26,18 @@ def local(ctx, debug=True):
     node_params = {
         'header_size': 1_000,  # bytes
         'max_header_delay': '200ms',  # ms
-        'gc_depth': 50,  # rounds
+        'gc_depth': 500,  # rounds
         'sync_retry_delay': '10_000ms',  # ms
         'sync_retry_nodes': 3,  # number of nodes
         'batch_size': 500_000,  # bytes
         'max_batch_delay': '200ms',  # ms,
+	    'block_synchronizer': {
+		'certificates_synchronize_timeout': '30s',
+		'payload_synchronize_timeout': '30s',
+		'payload_availability_timeout': '30s',
+		'handler_certificate_deliver_timeout': '30s'
+	    },
+
         "consensus_api_grpc": {
             "socket_addr": "/ip4/127.0.0.1/tcp/0/http",
             "get_collections_timeout": "5_000ms",

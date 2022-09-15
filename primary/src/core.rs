@@ -179,6 +179,7 @@ impl Core {
     #[async_recursion]
     #[instrument(level = "debug", skip_all)]
     async fn process_header(&mut self, header: &Header) -> DagResult<()> {
+        let start = std::time::SystemTime::now();
         debug!("Processing {:?} round:{:?}", header, header.round);
         let header_source = if self.name.eq(&header.author) {
             "own"
@@ -295,6 +296,7 @@ impl Core {
                     .push(handler);
             }
         }
+        config::utils::increment_channel_time(start,&self.metrics.core_process_beader);
         Ok(())
     }
 
@@ -302,6 +304,7 @@ impl Core {
     #[instrument(level = "debug", skip_all)]
     async fn process_vote(&mut self, vote: Vote) -> DagResult<()> {
         debug!("Processing {:?}", vote);
+        let start = std::time::SystemTime::now();
 
         // Add it to the votes' aggregator and try to make a new certificate.
         if let Some(certificate) =
@@ -336,6 +339,7 @@ impl Core {
                 _ => panic!("Failed to process valid certificate"),
             }
         }
+        config::utils::increment_channel_time(start,&self.metrics.core_process_vote);
         Ok(())
     }
 
@@ -347,6 +351,7 @@ impl Core {
             certificate,
             certificate.round()
         );
+        let start = std::time::SystemTime::now();
 
         // Let the proposer draw early conclusions from a certificate at this round and epoch, without its
         // parents or payload (which we may not have yet).
@@ -435,6 +440,7 @@ impl Core {
                 id, e
             );
         }
+        config::utils::increment_channel_time(start,&self.metrics.core_process_certificate);
         Ok(())
     }
 
@@ -558,7 +564,9 @@ impl Core {
             let result = tokio::select! {
                 // We receive here messages from other primaries.
                 Some(message) = self.rx_primaries.recv() => {
-                    match message {
+                    let start = std::time::SystemTime::now();
+
+                    let matched = match message {
                         PrimaryMessage::Header(header) => {
                             match self.sanitize_header(&header) {
                                 Ok(()) => self.process_header(&header).await,
@@ -579,23 +587,39 @@ impl Core {
                             }
                         },
                         _ => panic!("Unexpected core message")
-                    }
+                    };
+                    config::utils::increment_channel_time(start,&self.metrics.core_process_any);
+                    matched
                 },
 
                 // We receive here loopback headers from the `HeaderWaiter`. Those are headers for which we interrupted
                 // execution (we were missing some of their dependencies) and we are now ready to resume processing.
-                Some(header) = self.rx_header_waiter.recv() => self.process_header(&header).await,
+                Some(header) = self.rx_header_waiter.recv() => {
+                    let start = std::time::SystemTime::now();
+                    let result = self.process_header(&header).await;
+                    config::utils::increment_channel_time(start,&self.metrics.core_process_any);
+                    result
+                },
 
                 // We receive here loopback certificates from the `CertificateWaiter`. Those are certificates for which
                 // we interrupted execution (we were missing some of their ancestors) and we are now ready to resume
                 // processing.
-                Some(certificate) = self.rx_certificate_waiter.recv() => self.process_certificate(certificate).await,
-
+                Some(certificate) = self.rx_certificate_waiter.recv() => {
+                    let start = std::time::SystemTime::now();
+                    let result = self.process_certificate(certificate).await;
+                    config::utils::increment_channel_time(start,&self.metrics.core_process_any);
+                    result
+                },
                 // We also receive here our new headers created by the `Proposer`.
-                Some(header) = self.rx_proposer.recv() => self.process_own_header(header).await,
-
+                Some(header) = self.rx_proposer.recv() => {
+                    let start = std::time::SystemTime::now();
+                    let result = self.process_own_header(header).await;
+                    config::utils::increment_channel_time(start,&self.metrics.core_process_any);
+                    result
+                },
                 // Check whether the committee changed.
                 result = self.rx_reconfigure.changed() => {
+                    let start = std::time::SystemTime::now();
                     result.expect("Committee channel dropped");
                     let message = self.rx_reconfigure.borrow().clone();
                     match message {
@@ -612,11 +636,13 @@ impl Core {
                         ReconfigureNotification::Shutdown => return
                     }
                     tracing::debug!("Committee updated to {}", self.committee);
+                    config::utils::increment_channel_time(start,&self.metrics.core_process_any);
                     Ok(())
                 }
 
                 // Check whether the consensus round has changed, to clean up structures
                 Ok(()) = self.rx_consensus_round_updates.changed() => {
+                    let start = std::time::SystemTime::now();
                     let round = *self.rx_consensus_round_updates.borrow();
                     if round > self.gc_depth {
                         let now = Instant::now();
@@ -633,7 +659,7 @@ impl Core {
                             .with_label_values(&[&self.committee.epoch.to_string()])
                             .observe(now.elapsed().as_secs_f64());
                     }
-
+                    config::utils::increment_channel_time(start,&self.metrics.core_process_any);
                     Ok(())
                 }
 

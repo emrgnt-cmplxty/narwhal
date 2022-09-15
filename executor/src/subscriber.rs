@@ -49,7 +49,7 @@ pub struct Subscriber {
 
 impl Subscriber {
     /// Returns the max amount of pending consensus messages we should expect.
-    const MAX_PENDING_CONSENSUS_MESSAGES: usize = 2000;
+    const MAX_PENDING_CONSENSUS_MESSAGES: usize = 100_000;
 
     /// Spawn a new subscriber in a new tokio task.
     #[must_use]
@@ -118,6 +118,8 @@ impl Subscriber {
             tokio::select! {
                 // Receive the ordered sequence of consensus messages from a consensus node.
                 Some(message) = self.rx_consensus.recv(), if waiting.available_permits() > 0 => {
+                    let start = std::time::SystemTime::now();
+
                     // Fetch the certificate's payload from the workers. This is done via the
                     // block_waiter component. If the batches are not available in the workers then
                     // block_waiter will do its best to sync from the other peers. Once all batches
@@ -128,11 +130,16 @@ impl Subscriber {
                         self.tx_get_block_commands.clone(),
                         message);
                     waiting.push(future).await;
+
+                    config::utils::increment_channel_time(start,&self.metrics.executor_subscriber_rx_consensus);
+
                 },
 
                 // Receive here consensus messages for which we have downloaded all transactions data.
                 (Some(message), permit) = try_fut_and_permit!(waiting.try_next(), self.tx_executor) => {
-                    permit.send(message)
+                    let start = std::time::SystemTime::now();
+                    permit.send(message);
+                    config::utils::increment_channel_time(start,&self.metrics.executor_subscriber_permit_send);
                 },
 
                 // Check whether the committee changed.

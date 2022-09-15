@@ -1,6 +1,7 @@
 // Copyright (c) 2022, Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use crate::block_synchronizer::handler::Handler;
+use crate::metrics::{initialise_metrics, PrimaryMetrics};
 use config::{Committee, SharedWorkerCache};
 use crypto::PublicKey;
 use fastcrypto::{Digest, Hash};
@@ -260,6 +261,8 @@ pub struct BlockWaiter<SynchronizerHandler: Handler + Send + Sync + 'static> {
     /// block synchronizer in a synchronous way. Share a reference of this
     /// between components.
     block_synchronizer_handler: Arc<SynchronizerHandler>,
+    /// Metrics handler
+    metrics: Arc<PrimaryMetrics>,
 }
 
 impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<SynchronizerHandler> {
@@ -275,6 +278,7 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
         batch_receiver: Receiver<BatchResult>,
         block_synchronizer_handler: Arc<SynchronizerHandler>,
         worker_network: PrimaryToWorkerNetwork,
+        metrics: Arc<PrimaryMetrics>,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             Self {
@@ -290,6 +294,7 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
                 tx_get_block_map: HashMap::new(),
                 tx_get_blocks_map: HashMap::new(),
                 block_synchronizer_handler,
+                metrics,
             }
             .run()
             .await;
@@ -307,7 +312,9 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
         loop {
             tokio::select! {
                 Some(command) = self.rx_commands.recv() => {
-                    match command {
+                    let start = std::time::SystemTime::now();
+
+                    let result = match command {
                         BlockCommand::GetBlocks { ids, sender } => {
                             match self.handle_get_blocks_command(ids, sender).await {
                                 Some((get_block_futures, get_blocks_future)) => {
@@ -325,23 +332,33 @@ impl<SynchronizerHandler: Handler + Send + Sync + 'static> BlockWaiter<Synchroni
                                 None => debug!("no processing for command, will not wait for any results")
                             }
                         }
-                    }
+                    };
+
+                    config::utils::increment_channel_time(start,&self.metrics.block_waiter_rx_commands);
+                    result
                 },
                 // When we receive a BatchMessage (from a worker), this is
                 // this is captured by the rx_batch_receiver channel and
                 // handled appropriately.
                 Some(batch_message) = self.rx_batch_receiver.recv() => {
+                    let start = std::time::SystemTime::now();
                     self.handle_batch_message(batch_message).await;
+                    config::utils::increment_channel_time(start,&self.metrics.block_waiter_rx_batch_receiver);
+
                 },
                 // When we send a request to fetch a block's batches
                 // we wait on the results to come back before we proceed.
                 // By iterating the waiting vector it allow us to proceed
                 // whenever waiting has been finished for a request.
                 Some(result) = waiting_get_block.next() => {
+                    let start = std::time::SystemTime::now();
                     self.handle_batch_waiting_result(result).await;
+                    config::utils::increment_channel_time(start,&self.metrics.block_waiter_waiting_get_block);
                 },
                 Some(result) = waiting_get_blocks.next() => {
+                    let start = std::time::SystemTime::now();
                     self.handle_get_blocks_waiting_result(result).await;
+                    config::utils::increment_channel_time(start,&self.metrics.block_waiter_waiting_get_blocks);
                 }
 
                 // Check whether the committee changed. If the network address of our workers changed upon trying

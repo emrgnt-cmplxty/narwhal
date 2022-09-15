@@ -221,6 +221,8 @@ impl Proposer {
             let timer_expired = timer.is_elapsed();
 
             if (timer_expired || (enough_digests && advance)) && enough_parents {
+                info!("Inside proposer loop, enough_parents={}, self.payload_size={}, self.header_size={}, timer_expired={}", enough_parents, self.payload_size, self.header_size, timer_expired);
+
                 if timer_expired && matches!(self.network_model, NetworkModel::PartiallySynchronous)
                 {
                     // It is expected that this timer expires from time to time. If it expires too often, it

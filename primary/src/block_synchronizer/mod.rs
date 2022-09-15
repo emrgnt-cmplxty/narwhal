@@ -8,6 +8,7 @@ use crate::{
     },
     primary::PrimaryMessage,
     utils, PayloadToken, CHANNEL_CAPACITY,
+    metrics::{initialise_metrics, PrimaryMetrics},
 };
 use config::{BlockSynchronizerParameters, Committee, SharedWorkerCache, WorkerId};
 use crypto::PublicKey;
@@ -22,6 +23,7 @@ use rand::{rngs::SmallRng, SeedableRng};
 use std::{
     collections::{HashMap, HashSet},
     time::Duration,
+    sync::Arc,
 };
 use storage::CertificateStore;
 use store::Store;
@@ -202,6 +204,9 @@ pub struct BlockSynchronizer {
 
     /// Timeout when has requested the payload and waiting to receive
     payload_availability_timeout: Duration,
+    /// Metrics handler
+    metrics: Arc<PrimaryMetrics>,
+
 }
 
 impl BlockSynchronizer {
@@ -218,6 +223,7 @@ impl BlockSynchronizer {
         payload_store: Store<(BatchDigest, WorkerId), PayloadToken>,
         certificate_store: CertificateStore,
         parameters: BlockSynchronizerParameters,
+        metrics: Arc<PrimaryMetrics>,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             Self {
@@ -238,6 +244,7 @@ impl BlockSynchronizer {
                 certificates_synchronize_timeout: parameters.certificates_synchronize_timeout,
                 payload_synchronize_timeout: parameters.payload_availability_timeout,
                 payload_availability_timeout: parameters.payload_availability_timeout,
+                metrics,
             }
             .run()
             .await;
@@ -261,7 +268,8 @@ impl BlockSynchronizer {
         loop {
             tokio::select! {
                 Some(command) = self.rx_commands.recv() => {
-                    match command {
+                    let start = std::time::SystemTime::now();
+                    let command_result = match command {
                         Command::SynchronizeBlockHeaders { block_ids, respond_to } => {
                             let fut = self.handle_synchronize_block_headers_command(block_ids, respond_to).await;
                             if fut.is_some() {
@@ -274,16 +282,24 @@ impl BlockSynchronizer {
                                 waiting.push(fut.unwrap());
                             }
                         }
-                    }
+                    };
+                    config::utils::increment_channel_time(start,&self.metrics.block_sync_rx_commands);
+                    command_result
                 },
                 Some(response) = self.rx_certificate_responses.recv() => {
+                    let start = std::time::SystemTime::now();
                     self.handle_certificates_response(response).await;
+                    config::utils::increment_channel_time(start,&self.metrics.block_sync_rx_certificate_responses);
                 },
                 Some(response) = self.rx_payload_availability_responses.recv() => {
+                    let start = std::time::SystemTime::now();
                     self.handle_payload_availability_response(response).await;
+                    config::utils::increment_channel_time(start,&self.metrics.block_sync_rx_payload_availability_responses);
                 },
                 Some(state) = waiting.next() => {
-                    match state {
+                    let start = std::time::SystemTime::now();
+
+                    let result = match state {
                         State::HeadersSynchronized { request_id, certificates } => {
                             debug!("Result for the block headers synchronize request id {request_id}");
 
@@ -314,7 +330,9 @@ impl BlockSynchronizer {
 
                             self.notify_requestors_for_result(Payload(id), result).await;
                         },
-                    }
+                    };
+                    config::utils::increment_channel_time(start,&self.metrics.block_sync_waiting_next);
+                    result
                 }
 
                 // Check whether the committee changed.

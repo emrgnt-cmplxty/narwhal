@@ -129,7 +129,7 @@ impl Executor {
             tx_reconfigure.subscribe(),
             rx_consensus,
             tx_executor,
-            arc_metrics,
+            Arc::clone(&arc_metrics),
             restored_consensus_output,
         );
 
@@ -140,6 +140,7 @@ impl Executor {
             tx_reconfigure.subscribe(),
             /* rx_subscriber */ rx_executor,
             tx_output,
+            arc_metrics,
         );
 
         // Return the handle.

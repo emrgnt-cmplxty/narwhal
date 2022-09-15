@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     consensus::{ConsensusProtocol, ConsensusState, Dag},
+    metrics::ConsensusMetrics,
     utils, ConsensusOutput,
 };
 use config::{Committee, Stake};
@@ -22,6 +23,7 @@ pub struct Bullshark {
     pub store: Arc<ConsensusStore>,
     /// The depth of the garbage collector.
     pub gc_depth: Round,
+    pub metrics: Arc<ConsensusMetrics>
 }
 
 impl ConsensusProtocol for Bullshark {
@@ -32,6 +34,8 @@ impl ConsensusProtocol for Bullshark {
         certificate: Certificate,
     ) -> StoreResult<Vec<ConsensusOutput>> {
         debug!("Processing {:?}", certificate);
+        let start = std::time::SystemTime::now();
+        
         let round = certificate.round();
         let mut consensus_index = consensus_index;
 
@@ -121,6 +125,15 @@ impl ConsensusProtocol for Bullshark {
             debug!("Latest commit of {}: Round {}", name.encode_base64(), round);
         }
 
+        let end = std::time::SystemTime::now();
+        let diff: i64 = end
+            .duration_since(start)
+            .unwrap()
+            .as_micros()
+            .try_into()
+            .unwrap();
+        self.metrics.process_certificate_runtime.observe(diff as f64);
+        self.metrics.process_certificate_total_runtime.set(self.metrics.process_certificate_total_runtime.get() + diff);
         Ok(sequence)
     }
 
@@ -132,11 +145,12 @@ impl ConsensusProtocol for Bullshark {
 
 impl Bullshark {
     /// Create a new Bullshark consensus instance.
-    pub fn new(committee: Committee, store: Arc<ConsensusStore>, gc_depth: Round) -> Self {
+    pub fn new(committee: Committee, store: Arc<ConsensusStore>, gc_depth: Round, metrics: Arc<ConsensusMetrics>) -> Self {
         Self {
             committee,
             store,
             gc_depth,
+            metrics
         }
     }
 

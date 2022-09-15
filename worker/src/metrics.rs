@@ -46,6 +46,7 @@ pub struct WorkerMetrics {
     pub pending_elements_worker_synchronizer: IntGaugeVec,
     /// Number of created batches from the batch_maker
     pub created_batch_size: HistogramVec,
+    pub worker_sync_rx_message: IntGauge
 }
 
 impl WorkerMetrics {
@@ -65,6 +66,13 @@ impl WorkerMetrics {
                 registry
             )
             .unwrap(),
+            worker_sync_rx_message: register_int_gauge_with_registry!(
+                "worker_sync_rx_message",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+
         }
     }
 }

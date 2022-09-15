@@ -1,13 +1,13 @@
 // Copyright (c) 2022, Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 use prometheus::{
-    default_registry, register_int_counter_with_registry, register_int_gauge_vec_with_registry,
-    register_int_gauge_with_registry, IntCounter, IntGauge, IntGaugeVec, Registry,
+    default_registry, register_int_counter_with_registry, register_int_gauge_vec_with_registry, register_histogram_with_registry,
+    register_int_gauge_with_registry, IntCounter, IntGauge, IntGaugeVec, Registry, Histogram
 };
 
 #[derive(Clone, Debug)]
 pub struct ConsensusMetrics {
-    /// The number of rounds for which the Dag holds certificates (for Tusk or Bullshark)
+/// The number of rounds for which the Dag holds certificates (for Tusk or Bullshark)
     pub consensus_dag_rounds: IntGaugeVec,
     /// The last committed round from consensus
     pub last_committed_round: IntGaugeVec,
@@ -21,6 +21,10 @@ pub struct ConsensusMetrics {
     /// The number of certificates from consensus that were restored and sent to the executor
     /// following a node restart
     pub recovered_consensus_output: IntCounter,
+
+    pub process_certificate_runtime: Histogram,
+    pub process_certificate_total_runtime: IntGauge,
+
 }
 
 impl ConsensusMetrics {
@@ -60,6 +64,18 @@ impl ConsensusMetrics {
                 "The number of certificates from consensus that were restored and sent to the executor following a node restart",
                 registry
             ).unwrap(),
+            process_certificate_runtime: register_histogram_with_registry!(
+                "process_certificate_runtime",
+                "Time spent processing certificates at runtime",
+                registry
+            )
+            .unwrap(),
+            process_certificate_total_runtime: register_int_gauge_with_registry!(
+                "process_certificate_total_runtime",
+                "Time spent calculating process_header in core",
+                registry
+            )
+            .unwrap(),
         }
     }
 }

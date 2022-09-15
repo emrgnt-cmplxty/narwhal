@@ -302,10 +302,28 @@ pub struct PrimaryMetrics {
     pub pending_elements_certificate_waiter: IntGaugeVec,
     /// Number of elements in the waiting (ready-to-deliver) list of certificate_waiter
     pub waiting_elements_certificate_waiter: IntGaugeVec,
-    /// Time in WorkerReceiverHandler send message
+    /// Time in WorkerReceiverHandler send_message
     pub worker_receiver_send_message: IntGauge,
-    /// Time in PrimaryReceiverHandler send message
+    /// Time in PrimaryReceiverHandler send_message
     pub primary_receiver_send_message: IntGauge,
+    /// Core metrics
+    pub core_process_beader: IntGauge,
+    pub core_process_vote: IntGauge,
+    pub core_process_certificate: IntGauge,
+    pub core_process_any: IntGauge,
+
+    /// BlockSynchronizer metrics
+    pub block_sync_rx_commands: IntGauge,
+    pub block_sync_rx_certificate_responses: IntGauge,
+    pub block_sync_rx_payload_availability_responses: IntGauge,
+    pub block_sync_waiting_next: IntGauge,
+
+    /// BlockWaiter metrics
+    pub block_waiter_rx_commands: IntGauge,
+    pub block_waiter_rx_batch_receiver: IntGauge,
+    pub block_waiter_waiting_get_block: IntGauge,
+    pub block_waiter_waiting_get_blocks: IntGauge,
+
 }
 
 impl PrimaryMetrics {
@@ -432,6 +450,78 @@ impl PrimaryMetrics {
             primary_receiver_send_message: register_int_gauge_with_registry!(
                 "primary_receiver_send_message",
                 "Time spent calculating send_message in primary receiver",
+                registry
+            )
+            .unwrap(),
+            core_process_beader: register_int_gauge_with_registry!(
+                "core_process_beader",
+                "Time spent calculating process_header in core",
+                registry
+            )
+            .unwrap(),
+            core_process_vote: register_int_gauge_with_registry!(
+                "core_process_vote",
+                "Time spent calculating process_vote in core",
+                registry
+            )
+            .unwrap(),
+            core_process_certificate: register_int_gauge_with_registry!(
+                "core_process_certificate",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            core_process_any: register_int_gauge_with_registry!(
+                "core_process_any",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_sync_rx_commands: register_int_gauge_with_registry!(
+                "block_sync_rx_commands",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_sync_rx_certificate_responses: register_int_gauge_with_registry!(
+                "block_sync_rx_certificate_responses",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_sync_rx_payload_availability_responses: register_int_gauge_with_registry!(
+                "block_sync_rx_payload_availability_responses",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_sync_waiting_next: register_int_gauge_with_registry!(
+                "block_sync_waiting_next",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_waiter_rx_commands: register_int_gauge_with_registry!(
+                "block_waiter_rx_commands",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_waiter_rx_batch_receiver: register_int_gauge_with_registry!(
+                "block_waiter_rx_batch_receiver",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_waiter_waiting_get_block: register_int_gauge_with_registry!(
+                "block_waiter_waiting_get_block",
+                "Time spent calculating process_certificate in core",
+                registry
+            )
+            .unwrap(),
+            block_waiter_waiting_get_blocks: register_int_gauge_with_registry!(
+                "block_waiter_waiting_get_blocks",
+                "Time spent calculating process_certificate in core",
                 registry
             )
             .unwrap(),

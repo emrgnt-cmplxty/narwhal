@@ -312,6 +312,7 @@ impl Primary {
             rx_batches,
             block_synchronizer_handler.clone(),
             block_waiter_primary_network,
+            node_metrics.clone(),
         );
 
         // Indicator variable for the gRPC server
@@ -352,6 +353,7 @@ impl Primary {
             payload_store.clone(),
             certificate_store.clone(),
             parameters.block_synchronizer,
+            node_metrics.clone(),
         );
 
         // Whenever the `Synchronizer` does not manage to validate a header due to missing parent certificates of

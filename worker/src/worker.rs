@@ -151,7 +151,7 @@ impl Worker {
         network_metrics: Arc<WorkerNetworkMetrics>,
     ) -> Vec<JoinHandle<()>> {
         let (tx_synchronizer, rx_synchronizer) =
-            channel(CHANNEL_CAPACITY, &channel_metrics.tx_synchronizer);
+            channel(100_000, &channel_metrics.tx_synchronizer);
 
         // Receive incoming messages from our primary.
         let address = self

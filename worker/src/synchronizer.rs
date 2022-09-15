@@ -139,6 +139,7 @@ impl Synchronizer {
                 // Handle primary's messages.
                 Some(message) = self.rx_message.recv() => match message {
                     PrimaryWorkerMessage::Synchronize(digests, target) => {
+                        let start = std::time::SystemTime::now();
                         let mut missing = HashSet::new();
                         let mut available = HashSet::new();
 
@@ -213,8 +214,11 @@ impl Synchronizer {
                         } else {
                             debug!("All batches are already available {:?} nothing to request from peers", digests);
                         }
+                        config::utils::increment_channel_time(start,&self.metrics.worker_sync_rx_message);
+
                     },
                     PrimaryWorkerMessage::Cleanup(round) => {
+                        let start = std::time::SystemTime::now();
                         // Keep track of the primary's round number.
                         self.round = round;
 
@@ -230,8 +234,10 @@ impl Synchronizer {
                             }
                         }
                         self.pending.retain(|_, (r, _, _)| r > &mut gc_round);
+                        config::utils::increment_channel_time(start,&self.metrics.worker_sync_rx_message);
                     },
                     PrimaryWorkerMessage::Reconfigure(message) => {
+                        let start = std::time::SystemTime::now();
                         // Reconfigure this task and update the shared committee.
                         let shutdown = match &message {
                             ReconfigureNotification::NewEpoch(new_committee) => {
@@ -259,10 +265,11 @@ impl Synchronizer {
                                 self.round = 0;
                                 waiting.clear();
 
-
+                                config::utils::increment_channel_time(start,&self.metrics.worker_sync_rx_message);
                                 false
                             }
                             ReconfigureNotification::UpdateCommittee(new_committee) => {
+                                let start = std::time::SystemTime::now();
                                 self.network.cleanup(self.worker_cache.load().network_diff(new_committee.keys()));
                                 self.committee.swap(Arc::new(new_committee.clone()));
 
@@ -284,6 +291,7 @@ impl Synchronizer {
                                 }));
 
                                 tracing::debug!("Committee updated to {}", self.committee);
+                                config::utils::increment_channel_time(start,&self.metrics.worker_sync_rx_message);
                                 false
                             }
                             ReconfigureNotification::Shutdown => true
@@ -300,10 +308,14 @@ impl Synchronizer {
                         }
                     }
                     PrimaryWorkerMessage::RequestBatch(digest) => {
+                        let start = std::time::SystemTime::now();
                         self.handle_request_batch(digest).await;
+                        config::utils::increment_channel_time(start,&self.metrics.worker_sync_rx_message);
                     },
                     PrimaryWorkerMessage::DeleteBatches(digests) => {
+                        let start = std::time::SystemTime::now();
                         self.handle_delete_batches(digests).await;
+                        config::utils::increment_channel_time(start,&self.metrics.worker_sync_rx_message);
                     }
                 },
 
